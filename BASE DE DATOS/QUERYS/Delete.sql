@@ -1,0 +1,192 @@
+-- Deshabilitar temporalmente las restricciones de clave externa
+DECLARE @sql NVARCHAR(MAX) = N'';
+SELECT @sql += N'ALTER TABLE ' + QUOTENAME(OBJECT_NAME(parent_object_id)) + ' NOCHECK CONSTRAINT ' + QUOTENAME(name) + '; '
+FROM sys.foreign_keys;
+EXEC sp_executesql @sql;
+
+-- Eliminar todas las restricciones de clave externa
+DECLARE @dropConstraints NVARCHAR(MAX) = N'';
+SELECT @dropConstraints += N'ALTER TABLE ' + QUOTENAME(OBJECT_NAME(parent_object_id)) + ' DROP CONSTRAINT ' + QUOTENAME(name) + '; '
+FROM sys.foreign_keys;
+EXEC sp_executesql @dropConstraints;
+
+-- Eliminar todas las tablas
+DECLARE @dropTables NVARCHAR(MAX) = N'';
+SELECT @dropTables += N'DROP TABLE ' + QUOTENAME(name) + '; '
+FROM sys.tables;
+EXEC sp_executesql @dropTables;
+
+
+
+-- Deshabilitar temporalmente las restricciones de clave externa
+--ALTER TABLE Roles_Permisos NOCHECK CONSTRAINT ALL;
+--ALTER TABLE Usuarios NOCHECK CONSTRAINT ALL;
+--ALTER TABLE Clientes NOCHECK CONSTRAINT ALL;
+--ALTER TABLE Direcciones NOCHECK CONSTRAINT ALL;
+--ALTER TABLE Ciudades NOCHECK CONSTRAINT ALL;
+--ALTER TABLE Proyectos NOCHECK CONSTRAINT ALL;
+--ALTER TABLE Proyectos_Categorias NOCHECK CONSTRAINT ALL;
+--ALTER TABLE Proyectos_Tipos NOCHECK CONSTRAINT ALL;
+--ALTER TABLE Tareas NOCHECK CONSTRAINT ALL;
+--ALTER TABLE Tareas_Prioridades NOCHECK CONSTRAINT ALL;
+--ALTER TABLE Tareas_Etiquetas NOCHECK CONSTRAINT ALL;
+--ALTER TABLE Recursos NOCHECK CONSTRAINT ALL;
+--ALTER TABLE Historial_Tareas NOCHECK CONSTRAINT ALL;
+--ALTER TABLE Documentos NOCHECK CONSTRAINT ALL;
+--ALTER TABLE Login_Auditoria NOCHECK CONSTRAINT ALL;
+--ALTER TABLE Bolsa_Horas NOCHECK CONSTRAINT ALL;
+--ALTER TABLE Comentarios NOCHECK CONSTRAINT ALL;
+--ALTER TABLE Notificaciones NOCHECK CONSTRAINT ALL;
+--ALTER TABLE Facturacion NOCHECK CONSTRAINT ALL;
+--ALTER TABLE Pagos NOCHECK CONSTRAINT ALL;
+--ALTER TABLE Eventos NOCHECK CONSTRAINT ALL;
+--ALTER TABLE Asistentes NOCHECK CONSTRAINT ALL;
+--ALTER TABLE Preguntas_Encuesta NOCHECK CONSTRAINT ALL;
+--ALTER TABLE Respuestas_Encuesta NOCHECK CONSTRAINT ALL;
+--ALTER TABLE Respuestas_Usuarios NOCHECK CONSTRAINT ALL;
+--ALTER TABLE Informes NOCHECK CONSTRAINT ALL;
+--ALTER TABLE Versiones_Informes NOCHECK CONSTRAINT ALL;
+--ALTER TABLE Proyectos_Productos NOCHECK CONSTRAINT ALL;
+--ALTER TABLE Historial_Notificaciones NOCHECK CONSTRAINT ALL;
+--ALTER TABLE Actividades NOCHECK CONSTRAINT ALL;
+--ALTER TABLE Evaluaciones_Indicadores NOCHECK CONSTRAINT ALL;
+--ALTER TABLE Mensajes NOCHECK CONSTRAINT ALL;
+--ALTER TABLE Chats NOCHECK CONSTRAINT ALL;
+
+-- Eliminar restricciones de clave externa
+ALTER TABLE Roles_Permisos DROP CONSTRAINT FK_Roles_Permisos_Rol;
+ALTER TABLE Roles_Permisos DROP CONSTRAINT FK_Roles_Permisos_Permiso;
+ALTER TABLE Usuarios DROP CONSTRAINT FK_Usuarios_Rol;
+ALTER TABLE Clientes DROP CONSTRAINT FK_Clientes_Direccion;
+ALTER TABLE Direcciones DROP CONSTRAINT FK_Direcciones_Ciudad;
+ALTER TABLE Ciudades DROP CONSTRAINT FK_Ciudades_Pais;
+ALTER TABLE Proyectos DROP CONSTRAINT FK_Proyectos_Cliente;
+ALTER TABLE Proyectos DROP CONSTRAINT FK_Proyectos_Estado;
+ALTER TABLE Proyectos_Categorias DROP CONSTRAINT FK_Proyectos_Categorias_Proyecto;
+ALTER TABLE Proyectos_Categorias DROP CONSTRAINT FK_Proyectos_Categorias_Categoria;
+ALTER TABLE Proyectos_Tipos DROP CONSTRAINT FK_Proyectos_Tipos_Proyecto;
+ALTER TABLE Proyectos_Tipos DROP CONSTRAINT FK_Proyectos_Tipos_Tipo;
+ALTER TABLE Tareas DROP CONSTRAINT FK_Tareas_Proyecto;
+ALTER TABLE Tareas DROP CONSTRAINT FK_Tareas_Estado;
+ALTER TABLE Tareas DROP CONSTRAINT FK_Tareas_AsignadoA;
+ALTER TABLE Tareas_Prioridades DROP CONSTRAINT FK_Tareas_Prioridades_Tarea;
+ALTER TABLE Tareas_Prioridades DROP CONSTRAINT FK_Tareas_Prioridades_Prioridad;
+ALTER TABLE Tareas_Etiquetas DROP CONSTRAINT FK_Tareas_Etiquetas_Tarea;
+ALTER TABLE Tareas_Etiquetas DROP CONSTRAINT FK_Tareas_Etiquetas_Etiqueta;
+ALTER TABLE Recursos DROP CONSTRAINT FK_Recursos_Tipo;
+ALTER TABLE Recursos DROP CONSTRAINT FK_Recursos_Proyecto;
+ALTER TABLE Historial_Tareas DROP CONSTRAINT FK_Historial_Tareas_Tarea;
+ALTER TABLE Historial_Tareas DROP CONSTRAINT FK_Historial_Tareas_Usuario;
+ALTER TABLE Documentos DROP CONSTRAINT FK_Documentos_Tarea;
+ALTER TABLE Documentos DROP CONSTRAINT FK_Documentos_SubidoPor;
+ALTER TABLE Login_Auditoria DROP CONSTRAINT FK_Login_Auditoria_Usuario;
+ALTER TABLE Bolsa_Horas DROP CONSTRAINT FK_Bolsa_Horas_Usuario;
+ALTER TABLE Bolsa_Horas DROP CONSTRAINT FK_Bolsa_Horas_Proyecto;
+ALTER TABLE Comentarios DROP CONSTRAINT FK_Comentarios_Tarea;
+ALTER TABLE Comentarios DROP CONSTRAINT FK_Comentarios_Usuario;
+ALTER TABLE Notificaciones DROP CONSTRAINT FK_Notificaciones_Usuario;
+ALTER TABLE Facturacion DROP CONSTRAINT FK_Facturacion_Proyecto;
+ALTER TABLE Pagos DROP CONSTRAINT FK_Pagos_Factura;
+ALTER TABLE Eventos DROP CONSTRAINT FK_Eventos_Proyecto;
+ALTER TABLE Asistentes DROP CONSTRAINT FK_Asistentes_Evento;
+ALTER TABLE Asistentes DROP CONSTRAINT FK_Asistentes_Usuario;
+ALTER TABLE Preguntas_Encuesta DROP CONSTRAINT FK_Preguntas_Encuesta_Encuesta;
+ALTER TABLE Respuestas_Encuesta DROP CONSTRAINT FK_Respuestas_Encuesta_Pregunta;
+ALTER TABLE Respuestas_Usuarios DROP CONSTRAINT FK_Respuestas_Usuarios_Respuesta;
+ALTER TABLE Respuestas_Usuarios DROP CONSTRAINT FK_Respuestas_Usuarios_Usuario;
+ALTER TABLE Informes DROP CONSTRAINT FK_Informes_Proyecto;
+ALTER TABLE Versiones_Informes DROP CONSTRAINT FK_Versiones_Informes_Informe;
+ALTER TABLE Proyectos_Productos DROP CONSTRAINT FK_Proyectos_Productos_Proyecto;
+ALTER TABLE Proyectos_Productos DROP CONSTRAINT FK_Proyectos_Productos_Producto;
+ALTER TABLE Historial_Notificaciones DROP CONSTRAINT FK_Historial_Notificaciones_Notificacion;
+ALTER TABLE Historial_Notificaciones DROP CONSTRAINT FK_Historial_Notificaciones_Usuario;
+ALTER TABLE Actividades DROP CONSTRAINT FK_Actividades_Proyecto;
+ALTER TABLE Evaluaciones_Indicadores DROP CONSTRAINT FK_Evaluaciones_Indicadores_Evaluacion;
+ALTER TABLE Evaluaciones_Indicadores DROP CONSTRAINT FK_Evaluaciones_Indicadores_Indicador;
+ALTER TABLE Mensajes DROP CONSTRAINT FK_Mensajes_Chat;
+ALTER TABLE Mensajes DROP CONSTRAINT FK_Mensajes_Usuario;
+ALTER TABLE Chats DROP CONSTRAINT FK_Chats_Proyecto;
+
+-- Eliminar todas las tablas
+DROP TABLE IF EXISTS Roles_Permisos;
+DROP TABLE IF EXISTS Usuarios;
+DROP TABLE IF EXISTS Clientes;
+DROP TABLE IF EXISTS Direcciones;
+DROP TABLE IF EXISTS Ciudades;
+DROP TABLE IF EXISTS Paises;
+DROP TABLE IF EXISTS Estados_Proyecto;
+DROP TABLE IF EXISTS Tipos_Proyecto;
+DROP TABLE IF EXISTS Categorias_Proyecto;
+DROP TABLE IF EXISTS Proyectos;
+DROP TABLE IF EXISTS Proyectos_Categorias;
+DROP TABLE IF EXISTS Proyectos_Tipos;
+DROP TABLE IF EXISTS Estados_Tarea;
+DROP TABLE IF EXISTS Prioridades_Tarea;
+DROP TABLE IF EXISTS Etiquetas;
+DROP TABLE IF EXISTS Tareas;
+DROP TABLE IF EXISTS Tareas_Prioridades;
+DROP TABLE IF EXISTS Tareas_Etiquetas;
+DROP TABLE IF EXISTS Tipos_Recurso;
+DROP TABLE IF EXISTS Recursos;
+DROP TABLE IF EXISTS Historial_Tareas;
+DROP TABLE IF EXISTS Documentos;
+DROP TABLE IF EXISTS Login_Auditoria;
+DROP TABLE IF EXISTS Bolsa_Horas;
+DROP TABLE IF EXISTS Comentarios;
+DROP TABLE IF EXISTS Notificaciones;
+DROP TABLE IF EXISTS Facturacion;
+DROP TABLE IF EXISTS Pagos;
+DROP TABLE IF EXISTS Eventos;
+DROP TABLE IF EXISTS Asistentes;
+DROP TABLE IF EXISTS Encuestas;
+DROP TABLE IF EXISTS Preguntas_Encuesta;
+DROP TABLE IF EXISTS Respuestas_Encuesta;
+DROP TABLE IF EXISTS Respuestas_Usuarios;
+DROP TABLE IF EXISTS Informes;
+DROP TABLE IF EXISTS Versiones_Informes;
+DROP TABLE IF EXISTS Productos;
+DROP TABLE IF EXISTS Proyectos_Productos;
+DROP TABLE IF EXISTS Configuracion;
+DROP TABLE IF EXISTS Plantillas_Correo;
+DROP TABLE IF EXISTS Historial_Notificaciones;
+DROP TABLE IF EXISTS Actividades;
+DROP TABLE IF EXISTS Evaluaciones_Desempeno;
+DROP TABLE IF EXISTS Indicadores_Desempeno;
+DROP TABLE IF EXISTS Evaluaciones_Indicadores;
+DROP TABLE IF EXISTS Mensajes;
+DROP TABLE IF EXISTS Chats;
+
+-- Habilitar nuevamente las restricciones de clave externa
+ALTER TABLE Roles_Permisos CHECK CONSTRAINT ALL;
+ALTER TABLE Usuarios CHECK CONSTRAINT ALL;
+ALTER TABLE Clientes CHECK CONSTRAINT ALL;
+ALTER TABLE Direcciones CHECK CONSTRAINT ALL;
+ALTER TABLE Ciudades CHECK CONSTRAINT ALL;
+ALTER TABLE Proyectos CHECK CONSTRAINT ALL;
+ALTER TABLE Proyectos_Categorias CHECK CONSTRAINT ALL;
+ALTER TABLE Proyectos_Tipos CHECK CONSTRAINT ALL;
+ALTER TABLE Tareas CHECK CONSTRAINT ALL;
+ALTER TABLE Tareas_Prioridades CHECK CONSTRAINT ALL;
+ALTER TABLE Tareas_Etiquetas CHECK CONSTRAINT ALL;
+ALTER TABLE Recursos CHECK CONSTRAINT ALL;
+ALTER TABLE Historial_Tareas CHECK CONSTRAINT ALL;
+ALTER TABLE Documentos CHECK CONSTRAINT ALL;
+ALTER TABLE Login_Auditoria CHECK CONSTRAINT ALL;
+ALTER TABLE Bolsa_Horas CHECK CONSTRAINT ALL;
+ALTER TABLE Comentarios CHECK CONSTRAINT ALL;
+ALTER TABLE Notificaciones CHECK CONSTRAINT ALL;
+ALTER TABLE Facturacion CHECK CONSTRAINT ALL;
+ALTER TABLE Pagos CHECK CONSTRAINT ALL;
+ALTER TABLE Eventos CHECK CONSTRAINT ALL;
+ALTER TABLE Asistentes CHECK CONSTRAINT ALL;
+ALTER TABLE Preguntas_Encuesta CHECK CONSTRAINT ALL;
+ALTER TABLE Respuestas_Encuesta CHECK CONSTRAINT ALL;
+ALTER TABLE Respuestas_Usuarios CHECK CONSTRAINT ALL;
+ALTER TABLE Informes CHECK CONSTRAINT ALL;
+ALTER TABLE Versiones_Informes CHECK CONSTRAINT ALL;
+ALTER TABLE Proyectos_Productos CHECK CONSTRAINT ALL;
+ALTER TABLE Historial_Notificaciones CHECK CONSTRAINT ALL;
+ALTER TABLE Actividades CHECK CONSTRAINT ALL;
+ALTER TABLE Evaluaciones_Indicadores CHECK CONSTRAINT ALL;
+ALTER TABLE Mensajes CHECK CONSTRAINT ALL;
+ALTER TABLE Chats CHECK CONSTRAINT ALL;
