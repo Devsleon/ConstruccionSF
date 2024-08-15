@@ -1,0 +1,421 @@
+FUNCTION cod_cust_idoc_input_debitor.
+*"----------------------------------------------------------------------
+*"*"Local Interface:
+*"  IMPORTING
+*"     VALUE(INPUT_METHOD) LIKE  BDWFAP_PAR-INPUTMETHD
+*"     VALUE(MASS_PROCESSING) LIKE  BDWFAP_PAR-MASS_PROC
+*"     VALUE(PI_XD99_USED) TYPE  CHAR1 DEFAULT SPACE
+*"     VALUE(PI_KNVK_SPECIAL) TYPE  CHAR1 DEFAULT SPACE
+*"  EXPORTING
+*"     VALUE(WORKFLOW_RESULT) LIKE  BDWFAP_PAR-RESULT
+*"     VALUE(APPLICATION_VARIABLE) LIKE  BDWFAP_PAR-APPL_VAR
+*"     VALUE(IN_UPDATE_TASK) LIKE  BDWFAP_PAR-UPDATETASK
+*"     VALUE(CALL_TRANSACTION_DONE) LIKE  BDWFAP_PAR-CALLTRANS
+*"  TABLES
+*"      IDOC_CONTRL STRUCTURE  EDIDC
+*"      IDOC_DATA STRUCTURE  EDIDD
+*"      IDOC_STATUS STRUCTURE  BDIDOCSTAT
+*"      RETURN_VARIABLES STRUCTURE  BDWFRETVAR
+*"      SERIALIZATION_INFO STRUCTURE  BDI_SER
+*"  EXCEPTIONS
+*"      WRONG_FUNCTION_CALLED
+*"----------------------------------------------------------------------
+  CONSTANTS:
+    lc_kna1_segment TYPE edilsegtyp VALUE 'E1KNA1M',
+    lc_knvv_segment TYPE edilsegtyp VALUE 'E1KNVVM',
+    lc_knvp_segment TYPE edilsegtyp VALUE 'E1KNVPM',
+    lc_knvk_segment TYPE edilsegtyp VALUE 'E1KNVKM'.
+
+  CONSTANTS lc_status_appl_doc_not_posted TYPE edi_status VALUE '51'.
+
+  DATA ls_e1kna1m        TYPE e1kna1m.
+  DATA ls_e1knvkm        TYPE e1knvkm.
+  DATA ls_e1kvvpm        TYPE e1knvpm.
+  DATA ls_idoc_data      TYPE edidd.
+  DATA lt_idoc_data      TYPE edidd_tt.
+  DATA lv_current_segnum TYPE edidd-segnum.
+  DATA lt_knvk           TYPE TABLE OF knvk.
+  DATA ls_kna1           TYPE kna1.
+  DATA lv_not_found      TYPE boole_d.
+  DATA lv_start_index    TYPE sy-tabix.
+  DATA lr_knvv_segment   TYPE REF TO edidd.
+  DATA lr_knvp_segment   TYPE REF TO edidd.
+  DATA ls_knvv           TYPE e1knvvm.
+  DATA lt_knvp           TYPE STANDARD TABLE OF knvp WITH DEFAULT KEY.
+  DATA lr_knvp           TYPE REF TO knvp.
+  DATA lv_index          TYPE sytabix.
+  DATA lt_e1kvvpm        TYPE STANDARD TABLE OF e1knvpm WITH DEFAULT KEY.
+  DATA ls_tkupa          TYPE tkupa.
+  DATA ls_tpaer          TYPE tpaer.
+  DATA lt_tpaer          TYPE TABLE OF tpaer.
+  DATA lt_tpaer_tmp      TYPE TABLE OF tpaer.
+  DATA lv_dummy          TYPE c.
+  DATA lv_vtweg          TYPE vtweg.
+
+  DATA ls_serialization_failed TYPE boolean.
+  DATA lt_key                  TYPE  t_ser_objkey.
+
+  FIELD-SYMBOLS <ls_idoc_data_e1kna1m> TYPE edidd.
+  FIELD-SYMBOLS <ls_knvk> TYPE knvk.
+  FIELD-SYMBOLS <ls_idoc_cntrl> TYPE edidc.
+
+  DATA lo_badi_cod_debmas_functions TYPE REF TO cod_debmas_functions.
+  DATA lv_delete_partner_functions TYPE abap_bool.
+
+  READ TABLE idoc_contrl INDEX 1 ASSIGNING <ls_idoc_cntrl>.
+
+  READ TABLE idoc_data ASSIGNING <ls_idoc_data_e1kna1m>
+                       WITH KEY segnam = lc_kna1_segment.
+  IF sy-subrc IS INITIAL.
+    ls_e1kna1m = <ls_idoc_data_e1kna1m>-sdata.
+  ELSE.
+    RAISE wrong_function_called.
+  ENDIF.
+
+  " if kunnr is initial just call standard FM and let it do the error handling
+  IF ls_e1kna1m-kunnr IS NOT INITIAL.
+
+    " Check for Serialization
+
+    " Prepare key to be stored in the bdser table for the instances
+    "  The key is a combination of following attributes
+    "  1. Doc Number : Idoc Number
+    "  2. Serialization Type : The key( COD_DEBMAS ) specific to the message type
+    "  3. Identification number: Business Partner ID is used as Identification Number
+    PERFORM key_for_serialization
+          CHANGING idoc_data[] lt_key.
+
+    "  Call to check if the Idoc is latest in the sequence. The Function Module sets the serialization_info
+    "  Once the Serialization info is filled the same is updated in BDSER table
+    "  if the serflag is set to true the idoc will not be processed any further
+    CALL FUNCTION 'COD_SERIALIZATION_CHECK'
+      EXPORTING
+        it_serialization_key    = lt_key
+      IMPORTING
+        ev_serialization_failed = ls_serialization_failed
+      CHANGING
+        ct_idoc_contrl          = idoc_contrl[]
+        ct_idoc_status          = idoc_status[]
+        ct_return_variables     = return_variables[]
+        ct_serialization_info   = serialization_info[].
+
+    IF ls_serialization_failed = 'X'.
+      REFRESH serialization_info.
+      RETURN.
+    ENDIF.
+**********************************************
+
+    "We need to read non self reflexiv partner functions and add them to idoc as we filter them out in C4C
+    "Two cases needs to be considered:
+    "1.) Partner functions aren't replicated at all (historic case). Then no KNVP segment is available.
+    "2.) Partner functions are replicated but no non self reflexive partner function exists. Then
+    "    a dummy KNVP segment is available.
+    PERFORM seek_segment TABLES idoc_data
+                USING <ls_idoc_cntrl>-docnum
+                      lc_knvp_segment
+                CHANGING lv_index
+                         lr_knvp_segment.
+
+    "3.) Partner functions are replicated but no non self reflexive partner function exists and no dummy exits
+    "    for compatibility reasons we use badi to differenciate from 1.)
+    TRY.
+        GET BADI lo_badi_cod_debmas_functions.
+
+        CALL BADI lo_badi_cod_debmas_functions->get_inbound_behavior
+          IMPORTING
+            ev_delete_partner_functions = lv_delete_partner_functions.
+      CATCH cx_badi_not_implemented.
+        lv_delete_partner_functions = abap_false.
+    ENDTRY.
+
+    IF lr_knvp_segment IS BOUND OR lv_delete_partner_functions = abap_true.
+      " Read the mandatory roles for the given account group.
+      SELECT SINGLE * FROM tkupa INTO ls_tkupa WHERE ktokd = ls_e1kna1m-ktokd.
+      IF sy-subrc IS INITIAL.
+        SELECT * FROM tpaer INTO TABLE lt_tpaer
+                            WHERE pargr = ls_tkupa-pargr
+                              AND papfl = abap_true.
+      ENDIF.
+
+      "--- Loop at the sales areas of the IDoc
+      DO.
+        lt_tpaer_tmp = lt_tpaer.
+
+        PERFORM seek_segment TABLES idoc_data
+                    USING <ls_idoc_cntrl>-docnum
+                          lc_knvv_segment
+                    CHANGING lv_start_index
+                             lr_knvv_segment.
+
+        IF lr_knvv_segment IS BOUND.
+          ls_knvv = lr_knvv_segment->sdata.
+        ELSE.
+          EXIT. " exit loop if no further knvv segments are found
+        ENDIF.
+        " check sales area
+        SELECT SINGLE vtweg FROM tvta INTO lv_vtweg
+                             WHERE vkorg = ls_knvv-vkorg
+                             AND   vtwku = ls_knvv-vtweg
+                             AND   spaku = ls_knvv-spart.
+        IF sy-subrc <> 0.
+          MESSAGE e644(f2) WITH ls_knvv-vkorg ls_knvv-vtweg ls_knvv-spart INTO lv_dummy.
+          CLEAR idoc_status.
+          idoc_status-status = lc_status_appl_doc_not_posted.
+          idoc_status-docnum = <ls_idoc_cntrl>-docnum.
+          PERFORM add_error_from_sy TABLES idoc_status.
+          REFRESH serialization_info.
+          RETURN.
+        ENDIF.
+
+        " read existing partner functions
+        CALL FUNCTION 'SD_KNVP_READ'
+          EXPORTING
+            fif_vkorg            = ls_knvv-vkorg
+            fif_vtweg            = ls_knvv-vtweg
+            fif_spart            = ls_knvv-spart
+            fif_kunnr            = ls_e1kna1m-kunnr
+          TABLES
+            fet_knvp             = lt_knvp
+          EXCEPTIONS
+            parameter_incomplete = 1
+            no_record_found      = 0 " ignore not found
+            OTHERS               = 3.
+        IF sy-subrc <> 0.
+          MESSAGE e530(sy) INTO lv_dummy.
+          CLEAR idoc_status.
+          idoc_status-status = lc_status_appl_doc_not_posted.
+          idoc_status-docnum = <ls_idoc_cntrl>-docnum.
+          PERFORM add_error_from_sy TABLES idoc_status.
+          REFRESH serialization_info.
+          RETURN.
+        ENDIF.
+
+        REFRESH lt_e1kvvpm.
+
+        "--- Loop at the partner functions of the IDoc
+        DO.
+          PERFORM read_sub_segment TABLES idoc_data
+                              USING lr_knvv_segment->*
+                                    lc_knvp_segment
+                              CHANGING lv_start_index
+                                       lr_knvp_segment.
+          IF lr_knvp_segment IS NOT BOUND.
+            EXIT.
+          ENDIF.
+          ls_e1kvvpm = lr_knvp_segment->sdata.
+
+          "Dummy segment indicates that no reflexive partner function is available
+          IF ls_e1kvvpm-parvw IS INITIAL "Dummy segment is passed
+          AND ls_e1kvvpm-kunn2 IS INITIAL.
+            DELETE idoc_data INDEX lv_start_index.
+          ELSE.
+            INSERT ls_e1kvvpm INTO TABLE lt_e1kvvpm.
+          ENDIF.
+        ENDDO.
+
+        IF lt_knvp[] IS INITIAL "on creation (no pf on db)
+        AND lt_e1kvvpm[] IS INITIAL. " if pf are not passed, system will do the defaulting
+          lv_start_index = lv_start_index + 1.
+          CONTINUE.
+        ENDIF.
+
+        REFRESH lt_idoc_data.
+
+        "Take over existing self reflexive partner functions
+        LOOP AT lt_knvp REFERENCE INTO lr_knvp
+          WHERE kunn2 = ls_e1kna1m-kunnr.
+
+          MOVE-CORRESPONDING lr_knvp->* TO ls_e1kvvpm .
+
+          ls_e1kvvpm-msgfn = '004'.
+          READ TABLE lt_e1kvvpm WITH KEY parvw = ls_e1kvvpm-parvw defpa = 'X'
+            TRANSPORTING NO FIELDS.
+          IF sy-subrc = 0 AND ls_e1kvvpm-defpa = 'X'.
+            CLEAR ls_e1kvvpm-defpa.
+          ELSE.
+            ls_e1kvvpm-defpa = '/'.
+          ENDIF.
+          ls_e1kvvpm-knref = '/'.
+          ls_e1kvvpm-parza = '/'.
+
+          ls_idoc_data-mandt  = lr_knvv_segment->mandt.
+          ls_idoc_data-docnum = lr_knvv_segment->docnum.
+          ls_idoc_data-segnam = lc_knvp_segment.
+          ls_idoc_data-psgnum = lr_knvv_segment->segnum.
+          ls_idoc_data-hlevel = lr_knvv_segment->hlevel + 1.
+          ls_idoc_data-dtint2 = lr_knvv_segment->dtint2.
+          ls_idoc_data-sdata  = ls_e1kvvpm.
+
+          INSERT ls_idoc_data INTO TABLE lt_idoc_data.
+          lv_start_index = lv_start_index + 1.
+
+          DELETE lt_tpaer_tmp WHERE parvw = lr_knvp->parvw.
+        ENDLOOP.
+
+        "Add the missing mandatory, self reflexive partner functions
+        LOOP AT lt_tpaer_tmp INTO ls_tpaer.
+          CLEAR ls_e1kvvpm.
+          ls_e1kvvpm-msgfn = '004'.
+          READ TABLE lt_e1kvvpm WITH KEY parvw = ls_tpaer-parvw
+            TRANSPORTING NO FIELDS.
+          IF sy-subrc <> 0.
+            ls_e1kvvpm-parvw = ls_tpaer-parvw.
+            ls_e1kvvpm-kunn2 = ls_e1kna1m-kunnr.
+            ls_idoc_data-mandt  = lr_knvv_segment->mandt.
+            ls_idoc_data-docnum = lr_knvv_segment->docnum.
+            ls_idoc_data-segnam = lc_knvp_segment.
+            ls_idoc_data-psgnum = lr_knvv_segment->segnum.
+            ls_idoc_data-hlevel = lr_knvv_segment->hlevel + 1.
+            ls_idoc_data-dtint2 = lr_knvv_segment->dtint2.
+            ls_idoc_data-sdata  = ls_e1kvvpm.
+
+            INSERT ls_idoc_data INTO TABLE lt_idoc_data.
+            lv_start_index = lv_start_index + 1.
+          ENDIF.
+        ENDLOOP.
+
+        "No partner function found in this sales area
+        IF lt_idoc_data IS INITIAL.
+          lv_start_index = lv_start_index + 1.
+          CONTINUE.
+        ENDIF.
+
+        PERFORM add_segments_after
+                    TABLES
+                       idoc_data
+                    USING
+                       lr_knvv_segment->*
+                       lt_idoc_data .
+
+      ENDDO.
+    ENDIF.
+
+    " all contacts should be deleted if C4C does not send any contacts
+    " therefore check for knvk segement and delete remaining contacts
+    " if c4c sends at least one contact standard will take care of deleting others
+
+    READ TABLE idoc_data WITH KEY segnam = lc_knvk_segment
+                         TRANSPORTING NO FIELDS.
+    IF sy-subrc <> 0.
+
+      CALL FUNCTION 'KNA1_SINGLE_READER'
+        EXPORTING
+          i_kunnr         = ls_e1kna1m-kunnr
+        IMPORTING
+          o_kna1          = ls_kna1
+        EXCEPTIONS
+          not_found       = 1
+          parameter_error = 2
+          internal_error  = 3
+          OTHERS          = 4.
+      IF sy-subrc = 1.
+        lv_not_found = 'X'.
+      ELSEIF sy-subrc <> 0 .
+        CLEAR idoc_status.
+        idoc_status-status = lc_status_appl_doc_not_posted.
+        idoc_status-docnum = <ls_idoc_data_e1kna1m>-docnum.
+        PERFORM add_error_from_sy TABLES idoc_status.
+        REFRESH serialization_info.
+        RETURN.
+      ENDIF.
+
+      IF lv_not_found IS INITIAL.
+        " do the deletions only for organizations and not for natural persons, because we do not have
+        " contact persons for natural persons in C4C. Thus we should not overwrite the data in ECC.
+        IF ls_kna1-stkzn IS INITIAL.
+          CALL FUNCTION 'KNVK_READ_CUSTOMER'
+            EXPORTING
+              i_kunnr         = ls_e1kna1m-kunnr
+            TABLES
+              o_knvk          = lt_knvk
+            EXCEPTIONS
+              not_found       = 0  " not found is ok
+              parameter_error = 2
+              OTHERS          = 3.
+
+          IF  sy-subrc <> 0.
+            "Errors other than not found should not occur. So raise error and exit
+            CLEAR idoc_status.
+            idoc_status-status = lc_status_appl_doc_not_posted.
+            idoc_status-docnum = <ls_idoc_data_e1kna1m>-docnum.
+            PERFORM add_error_from_sy TABLES idoc_status.
+            REFRESH serialization_info.
+            RETURN.
+          ELSEIF lt_knvk IS NOT INITIAL.
+            lv_current_segnum = LINES( idoc_data ).
+            READ TABLE idoc_data INTO ls_idoc_data INDEX lv_current_segnum.
+            lv_current_segnum = ls_idoc_data-segnum.
+
+            LOOP AT lt_knvk ASSIGNING <ls_knvk>.
+              CLEAR ls_idoc_data.
+              CLEAR ls_e1knvkm.
+
+              ls_e1knvkm-msgfn = '003'. "Delete
+              ls_e1knvkm-parnr = <ls_knvk>-parnr.
+
+              ADD 1 TO lv_current_segnum.
+              ls_idoc_data-mandt  = sy-mandt.
+              ls_idoc_data-docnum = <ls_idoc_data_e1kna1m>-docnum.
+              ls_idoc_data-segnum = lv_current_segnum.
+              ls_idoc_data-segnam = lc_knvk_segment.
+              ls_idoc_data-psgnum = <ls_idoc_data_e1kna1m>-segnum.
+              ls_idoc_data-hlevel = '02'.
+              ls_idoc_data-dtint2 = '1000'.
+              ls_idoc_data-sdata = ls_e1knvkm.
+              INSERT ls_idoc_data INTO TABLE idoc_data.
+            ENDLOOP.
+            " if sy-subrc is intial and lt_knvk is inital (not found), do nothing
+          ENDIF.
+        ENDIF.
+      ENDIF.
+    ENDIF.
+  ENDIF.
+
+  CALL FUNCTION 'IDOC_INPUT_DEBITOR'
+    EXPORTING
+      input_method          = input_method
+      mass_processing       = mass_processing
+      pi_xd99_used          = pi_xd99_used
+      pi_knvk_special       = pi_knvk_special
+    IMPORTING
+      workflow_result       = workflow_result
+      application_variable  = application_variable
+      in_update_task        = in_update_task
+      call_transaction_done = call_transaction_done
+    TABLES
+      idoc_contrl           = idoc_contrl
+      idoc_data             = idoc_data
+      idoc_status           = idoc_status
+      return_variables      = return_variables
+      serialization_info    = serialization_info
+    EXCEPTIONS
+      wrong_function_called = 1.
+
+  IF sy-subrc = 1.
+    REFRESH serialization_info.
+    RAISE wrong_function_called.
+  ENDIF.
+
+  READ TABLE idoc_status WITH KEY status = '51' TRANSPORTING NO FIELDS.
+  IF sy-subrc IS INITIAL.
+    REFRESH serialization_info.
+  ENDIF.
+*{   INSERT         PCDK905920                                        1
+"SLEON 13.08.2024 19:15:54 IDOC
+  READ TABLE idoc_data ASSIGNING <ls_idoc_data_e1kna1m>
+                       WITH KEY segnam = lc_kna1_segment.
+  IF sy-subrc IS INITIAL.
+    ls_e1kna1m = <ls_idoc_data_e1kna1m>-sdata.
+    CALL FUNCTION 'ZFMSD_HABEAS_DATA_INPUT'
+      EXPORTING
+      i_bahns  = ls_e1kna1m-bahns
+      i_update = 'X'
+      i_kunnr  = ls_e1kna1m-kunnr.
+  ELSE.
+    RAISE wrong_function_called.
+  ENDIF.
+
+"SLEON
+*}   INSERT
+
+ENDFUNCTION.
