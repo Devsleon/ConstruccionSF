@@ -28,7 +28,7 @@ public class Configuracion {
     public void salvarConfiguracion() {
         saveables.add(new ConfiguracionSistema());
         saveables.add(new ConfiguracionUsuario());
-
+        
         for (Saveable s : saveables) {
             s.save();
         }
