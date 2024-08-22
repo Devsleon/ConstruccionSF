@@ -32,5 +32,6 @@ public class Configuracion {
         for (Saveable s : saveables) {
             s.save();
         }
+        
     }    
 }

@@ -8,9 +8,14 @@ package configuracione2.pkg1;
  *
  * @author Seidor Colombia
  */
-public class ConfiguracionHoraria implements Loadable {
+public class ConfiguracionHoraria implements Loadable,Notificable {
  @Override
  public void load() {
         System.out.println("Configuracion horaria cargada");
     }  
+
+    @Override
+    public void notificable() {
+        System.out.println("Notificar");
+    }
 }
