@@ -12,6 +12,7 @@ JOIN Estados_Tarea EP ON T.estado_id = EP.estado_id
 JOIN Proyectos P ON T.proyecto_id = P.proyecto_id
 JOIN Usuarios U ON T.asignado_a = U.usuario_id
 WHERE U.nombre = 'María López';
+select * from Estados_Tarea
 
 -- Consultar el historial de una tarea específica
 SELECT HT.cambio, HT.fecha_cambio, U.nombre AS Usuario
