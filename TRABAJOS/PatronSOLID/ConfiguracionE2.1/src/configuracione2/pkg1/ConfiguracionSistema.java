@@ -8,7 +8,7 @@ package configuracione2.pkg1;
  *
  * @author Seidor Colombia
  */
-public class ConfiguracionSistema implements Loadable, Saveable, Notificable {
+public class ConfiguracionSistema implements Loadable, Saveable, Notificar{
     @Override
     public void load() {
            System.out.println("Configuracion sistema cargada");
@@ -20,7 +20,7 @@ public class ConfiguracionSistema implements Loadable, Saveable, Notificable {
     }   
 
     @Override
-    public void notificable() {
-        System.out.println("Notificar");
+    public void notificar() {
+        System.out.println("Notificando Configuracion del sistema");
     }
 }

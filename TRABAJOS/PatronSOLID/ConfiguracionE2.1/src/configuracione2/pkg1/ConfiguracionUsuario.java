@@ -8,7 +8,7 @@ package configuracione2.pkg1;
  *
  * @author Seidor Colombia
  */
-public class ConfiguracionUsuario implements Loadable, Saveable,Notificable  {
+public class ConfiguracionUsuario implements Loadable, Saveable,Notificar{
     @Override
     public void load() {
         System.out.println("Configuracion usuario cargada");
@@ -20,7 +20,7 @@ public class ConfiguracionUsuario implements Loadable, Saveable,Notificable  {
     }    
 
     @Override
-    public void notificable() {
-        System.out.println("Notificar configuracion");
+    public void notificar() {
+        System.out.println("Notificando Configuracion del Usuario");
     }
 }

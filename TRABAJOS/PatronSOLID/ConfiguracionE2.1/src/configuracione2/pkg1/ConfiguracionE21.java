@@ -17,6 +17,7 @@ public class ConfiguracionE21 {
         Configuracion config = new Configuracion();
         config.cargarConfiguracion();
         config.salvarConfiguracion();
+        config.NotificarConfiguracion();
         
     }
     

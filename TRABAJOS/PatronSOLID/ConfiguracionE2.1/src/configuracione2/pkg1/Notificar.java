@@ -8,6 +8,8 @@ package configuracione2.pkg1;
  *
  * @author Seidor Colombia
  */
-public interface Notificable {
-    void notificable();
+public interface Notificar {
+    void notificar();
 }
+
+
